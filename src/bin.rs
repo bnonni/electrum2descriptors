@@ -1,10 +1,11 @@
-#[cfg(feature = "wallet_file")]
-use libelectrum2descriptors::ElectrumWalletFile;
-use libelectrum2descriptors::{
-    ElectrumExtendedKey, ElectrumExtendedPrivKey, ElectrumExtendedPubKey,
+use bitcoin::{
+    secp256k1::SecretKey,
+    util::bip32::{ChainCode, ChildNumber, ExtendedPrivKey, Fingerprint},
+    Network, PrivateKey,
 };
 #[cfg(feature = "wallet_file")]
-use std::path::Path;
+use libelectrum2descriptors::ElectrumExtendedPrivKey;
+#[cfg(feature = "wallet_file")]
 use std::str::FromStr;
 
 fn main() -> Result<(), String> {
@@ -13,21 +14,35 @@ fn main() -> Result<(), String> {
     let err_msg =
         "You must specify an extended public or private key or an electrum wallet file as first argument".to_string();
     let electrum_x = args.next().ok_or_else(|| err_msg.clone())?;
-    let descriptor = ElectrumExtendedPrivKey::from_str(&electrum_x)
-        .map(|e| e.to_descriptors())
-        .or_else(|_| ElectrumExtendedPubKey::from_str(&electrum_x).map(|e| e.to_descriptors()));
-    #[cfg(feature = "wallet_file")]
-    let descriptor = descriptor.or_else(|_| {
-        let wallet_file = Path::new(&electrum_x)
-            .canonicalize()
-            .map_err(|_| err_msg.clone())?;
-        if !wallet_file.exists() {
-            return Err(err_msg);
-        }
-        let wallet = ElectrumWalletFile::from_file(wallet_file.as_path())?;
-        wallet.to_descriptors()
-    });
+    // println!("{:?}", electrum_x);
 
-    println!("{:?}", descriptor?);
+    let x = SecretKey::from_str(&electrum_x).unwrap();
+    let kind = "wpkh";
+    let xprv = ExtendedPrivKey {
+        network: Network::Bitcoin,
+        depth: 1,
+        parent_fingerprint: Fingerprint::from_str("a288f4a1").unwrap(),
+        child_number: ChildNumber::from_hardened_idx(0).unwrap(),
+        chain_code: ChainCode::from_str(
+            "860574f7d3b4bf94c000348085d236516fff1cb3de0eaef9385019902ae7ba2e",
+        )
+        .unwrap(),
+        private_key: PrivateKey {
+            network: Network::Bitcoin,
+            compressed: true,
+            key: x,
+        },
+    };
+    println!("Network: {}", xprv.network);
+    println!("Depth: {}", xprv.depth);
+    println!("Parent Fingerprint: {}", xprv.parent_fingerprint);
+    println!("Child Number: {}", xprv.child_number);
+    println!("Chain Code: {}", xprv.chain_code);
+    println!("Private Key Compressed: {}", xprv.private_key.compressed);
+    println!("Private Key Hex: {}", xprv.private_key.key.to_string());
+    println!("Kind: {}", kind);
+    let descriptor = ElectrumExtendedPrivKey::new(xprv, String::from(kind));
+
+    println!("{}", descriptor.electrum_xprv()?);
     Ok(())
 }

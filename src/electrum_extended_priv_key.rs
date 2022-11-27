@@ -113,6 +113,8 @@ impl FromStr for ElectrumExtendedPrivKey {
                 key,
             },
         };
+        
+
         Ok(ElectrumExtendedPrivKey { xprv, kind })
     }
 }
